@@ -191,11 +191,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # ─────────────────────────────────────────
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = config('EMAIL_HOST')
-EMAIL_PORT = config('EMAIL_PORT', cast=int)
+EMAIL_HOST = config('EMAIL_HOST', default = '')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = f"Neurovent <{config('EMAIL_HOST_USER')}>"
 
 # URL du frontend — utilisée dans les liens de reset envoyés par email
