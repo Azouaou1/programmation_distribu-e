@@ -22,3 +22,4 @@ rpds-py==0.30.0
 sqlparse==0.5.5
 uritemplate==4.2.0
 urllib3==2.6.3
+gunicorn==22.0.0
