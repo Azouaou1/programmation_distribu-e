@@ -115,11 +115,6 @@ SIMPLE_JWT = {
 #  CORS — autorise le front React (Vite)
 # ─────────────────────────────────────────
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://neuro-vent-six.vercel.app/",
-]
 CORS_ALLOW_ALL_ORIGINS = True
 
 
