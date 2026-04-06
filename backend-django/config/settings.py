@@ -196,7 +196,7 @@ EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
-DEFAULT_FROM_EMAIL = f"Neurovent <{config('EMAIL_HOST_USER')}>"
+DEFAULT_FROM_EMAIL = f"Neurovent <{config('EMAIL_HOST_USER', default='')}>"
 
 # URL du frontend — utilisée dans les liens de reset envoyés par email
 FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
