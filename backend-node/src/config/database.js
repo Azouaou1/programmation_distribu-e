@@ -8,9 +8,11 @@ const dialect = process.env.DB_DIALECT || 'sqlite';
 let sequelize;
 
 if (dialect === 'sqlite') {
-  const storage = process.env.DB_STORAGE
-    ? path.resolve(process.cwd(), process.env.DB_STORAGE)
-    : path.join(__dirname, '../../neurovent.sqlite');
+  const storage = process.env.DB_STORAGE === ':memory:'
+    ? ':memory:'
+    : process.env.DB_STORAGE
+      ? path.resolve(process.cwd(), process.env.DB_STORAGE)
+      : path.join(__dirname, '../../neurovent.sqlite');
 
   sequelize = new Sequelize({
     dialect: 'sqlite',

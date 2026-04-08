@@ -2,12 +2,18 @@
 
 const { Op, fn, col, literal } = require('sequelize');
 const { sequelize, Event, User, Tag, Registration } = require('../models');
-const { sendEventCancelled } = require('../services/emailService');
+const { sendEventCancelled, sendEventUpdated } = require('../services/emailService');
+const {
+  captureEventNotificationSnapshot,
+  getEventUpdateMessages,
+  resetScheduledNotificationFlags,
+  notifyEventCapacityMilestones,
+} = require('../utils/notificationUtils');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function buildEventListItem(event, confirmedCount) {
-  const remaining = event.capacity - confirmedCount;
+  const spotsRemaining = event.unlimited_capacity ? null : (event.capacity - confirmedCount);
   return {
     id: event.id,
     title: event.title,
@@ -17,10 +23,12 @@ function buildEventListItem(event, confirmedCount) {
     format: event.format,
     registration_mode: event.registration_mode,
     registration_deadline: event.registration_deadline,
+    allow_registration_during_event: event.allow_registration_during_event,
     registration_open: event.isRegistrationOpen(),
     capacity: event.capacity,
-    spots_remaining: remaining,
-    is_full: remaining <= 0,
+    unlimited_capacity: event.unlimited_capacity,
+    spots_remaining: spotsRemaining,
+    is_full: event.unlimited_capacity ? false : spotsRemaining <= 0,
     status: event.status,
     tags: (event.tags || []).map(t => ({ id: t.id, name: t.name })),
     company_name: event.company ? event.company.company_name : null,
@@ -34,7 +42,7 @@ function buildEventListItem(event, confirmedCount) {
 function buildEventDetail(event) {
   const registrations = event.registrations || [];
   const confirmedCount = registrations.filter(r => r.status === 'CONFIRMED').length;
-  const remaining = event.capacity - confirmedCount;
+  const spotsRemaining = event.unlimited_capacity ? null : (event.capacity - confirmedCount);
 
   return {
     id: event.id,
@@ -46,9 +54,12 @@ function buildEventDetail(event) {
     format: event.format,
     registration_mode: event.registration_mode,
     registration_deadline: event.registration_deadline,
+    allow_registration_during_event: event.allow_registration_during_event,
     registration_open: event.isRegistrationOpen(),
     capacity: event.capacity,
-    spots_remaining: remaining,
+    unlimited_capacity: event.unlimited_capacity,
+    spots_remaining: spotsRemaining,
+    is_full: event.unlimited_capacity ? false : spotsRemaining <= 0,
     status: event.status,
     tags: (event.tags || []).map(t => ({ id: t.id, name: t.name })),
     company_name: event.company ? event.company.company_name : null,
@@ -189,8 +200,10 @@ async function createEvent(req, res) {
 
   const {
     title, description, date_start, date_end, capacity,
+    unlimited_capacity = false,
     status = 'DRAFT', format = 'ONSITE', registration_mode = 'AUTO',
     registration_deadline,
+    allow_registration_during_event = false,
     address_full, address_city, address_country,
     address_visibility = 'FULL', address_reveal_date,
     online_platform, online_link,
@@ -198,8 +211,9 @@ async function createEvent(req, res) {
     tag_ids,
   } = req.body;
 
-  if (!title || !description || !date_start || !date_end || !capacity) {
-    return res.status(400).json({ error: 'Les champs title, description, date_start, date_end, capacity sont requis.' });
+  const isUnlimited = unlimited_capacity === true || unlimited_capacity === 'true';
+  if (!title || !description || !date_start || !date_end || (!isUnlimited && !capacity)) {
+    return res.status(400).json({ error: 'Les champs title, description, date_start, date_end sont requis. capacity est requis si unlimited_capacity est false.' });
   }
 
   if (new Date(date_end) <= new Date(date_start)) {
@@ -220,9 +234,11 @@ async function createEvent(req, res) {
     company_id: user.id,
     title, description,
     date_start, date_end,
-    capacity: parseInt(capacity),
+    capacity: isUnlimited ? null : parseInt(capacity),
+    unlimited_capacity: isUnlimited,
     status, format, registration_mode,
     registration_deadline: registration_deadline || null,
+    allow_registration_during_event: allow_registration_during_event === true || allow_registration_during_event === 'true',
     address_full: address_full || '',
     address_city: address_city || '',
     address_country: address_country || '',
@@ -290,11 +306,13 @@ async function updateEvent(req, res) {
   }
 
   const oldStatus = event.status;
+  const previousSnapshot = captureEventNotificationSnapshot(event);
 
   const updates = {};
   const fields = [
-    'title', 'description', 'date_start', 'date_end', 'capacity',
+    'title', 'description', 'date_start', 'date_end',
     'status', 'format', 'registration_mode', 'registration_deadline',
+    'allow_registration_during_event',
     'address_full', 'address_city', 'address_country',
     'address_visibility', 'address_reveal_date',
     'online_platform', 'online_link', 'online_visibility', 'online_reveal_date',
@@ -302,7 +320,18 @@ async function updateEvent(req, res) {
   for (const f of fields) {
     if (req.body[f] !== undefined) updates[f] = req.body[f];
   }
-  if (capacity !== undefined) updates.capacity = parseInt(capacity);
+  // Gérer unlimited_capacity + capacity ensemble
+  if (req.body.unlimited_capacity !== undefined) {
+    const isUnlimited = req.body.unlimited_capacity === true || req.body.unlimited_capacity === 'true';
+    updates.unlimited_capacity = isUnlimited;
+    if (isUnlimited) {
+      updates.capacity = null;
+    } else if (capacity !== undefined) {
+      updates.capacity = parseInt(capacity);
+    }
+  } else if (capacity !== undefined) {
+    updates.capacity = parseInt(capacity);
+  }
   if (req.file) updates.banner = `/media/banners/${req.file.filename}`;
 
   await event.update(updates);
@@ -313,9 +342,30 @@ async function updateEvent(req, res) {
     await event.setTags(tags);
   }
 
+  // Réinitialiser les flags de notifications si les champs concernés ont changé
+  await resetScheduledNotificationFlags(event, previousSnapshot);
+
   // Notifier si statut → CANCELLED
   if (oldStatus !== 'CANCELLED' && event.status === 'CANCELLED') {
     sendEventCancelled(event).catch(() => {});
+  } else {
+    // Notifier les participants confirmés des changements pratiques
+    const changes = getEventUpdateMessages(previousSnapshot, event);
+    if (changes.length > 0) {
+      const confirmedRegs = await Registration.findAll({
+        where: { event_id: event.id, status: 'CONFIRMED' },
+        include: [
+          { association: 'participant', attributes: ['id', 'email', 'first_name', 'last_name'] },
+          { association: 'event' },
+        ],
+      });
+      for (const reg of confirmedRegs) {
+        sendEventUpdated(reg, changes).catch(() => {});
+      }
+    }
+    // Alertes de capacité
+    await event.reload({ include: [{ association: 'company', attributes: ['id', 'company_name', 'recovery_email'] }] });
+    notifyEventCapacityMilestones(event).catch(() => {});
   }
 
   await event.reload({ include: EVENT_INCLUDES });
@@ -363,8 +413,10 @@ async function eventStats(req, res) {
     Registration.count({ where: { event_id: event.id, status: 'CANCELLED' } }),
   ]);
 
-  const occupationRate = event.capacity > 0 ? Math.round((confirmed / event.capacity) * 100 * 10) / 10 : 0;
-  const spotsRemaining = event.capacity - confirmed;
+  const occupationRate = (!event.unlimited_capacity && event.capacity > 0)
+    ? Math.round((confirmed / event.capacity) * 100 * 10) / 10
+    : null;
+  const spotsRemaining = event.unlimited_capacity ? null : (event.capacity - confirmed);
 
   return res.json({
     event: {
@@ -375,6 +427,8 @@ async function eventStats(req, res) {
       date_start: event.date_start,
       date_end: event.date_end,
       capacity: event.capacity,
+      unlimited_capacity: event.unlimited_capacity,
+      allow_registration_during_event: event.allow_registration_during_event,
       registration_mode: event.registration_mode,
     },
     registrations: { total, confirmed, pending, rejected, cancelled },
@@ -606,6 +660,56 @@ async function exportDashboardPerformance(req, res) {
   res.end();
 }
 
+// ─── Admin — Liste tous les events ───────────────────────────────────────────
+
+async function adminListEvents(req, res) {
+  const { format, status: statusFilter, ordering, date_after, date_before } = req.query;
+
+  const where = {};
+  if (statusFilter) where.status = statusFilter;
+  if (format) where.format = format;
+  if (date_after) where.date_start = { ...(where.date_start || {}), [Op.gte]: new Date(date_after) };
+  if (date_before) where.date_start = { ...(where.date_start || {}), [Op.lte]: new Date(date_before) };
+
+  let order = [['date_start', 'ASC']];
+  if (ordering) {
+    const desc = ordering.startsWith('-');
+    const field = desc ? ordering.slice(1) : ordering;
+    const allowed = ['date_start', 'date_end', 'capacity', 'created_at'];
+    if (allowed.includes(field)) order = [[field, desc ? 'DESC' : 'ASC']];
+  }
+
+  const events = await Event.findAll({
+    where,
+    include: EVENT_INCLUDES,
+    order,
+  });
+
+  const results = events.map(event => {
+    const confirmedCount = (event.registrations || []).filter(r => r.status === 'CONFIRMED').length;
+    return buildEventListItem(event, confirmedCount);
+  });
+
+  return res.json({ count: results.length, results });
+}
+
+// ─── Admin — Détail d'un event ────────────────────────────────────────────────
+
+async function adminGetEvent(req, res) {
+  const event = await Event.findByPk(req.params.id, { include: EVENT_INCLUDES });
+  if (!event) return res.status(404).json({ error: 'Événement introuvable.' });
+  return res.json(buildEventDetail(event));
+}
+
+// ─── Admin — Supprimer n'importe quel event ───────────────────────────────────
+
+async function adminDeleteEvent(req, res) {
+  const event = await Event.findByPk(req.params.id);
+  if (!event) return res.status(404).json({ error: 'Événement introuvable.' });
+  await event.destroy();
+  return res.status(204).send();
+}
+
 module.exports = {
   listEvents,
   getEvent,
@@ -618,4 +722,7 @@ module.exports = {
   dashboardStats,
   exportDashboardSummary,
   exportDashboardPerformance,
+  adminListEvents,
+  adminGetEvent,
+  adminDeleteEvent,
 };

@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { getMyEventsApi } from "../api/events";
+import { usePreferences } from "../context/PreferencesContext";
 import "../styles/Dashboard.css";
 
 export default function MyEvents() {
   const navigate = useNavigate();
+  const { t } = usePreferences();
   const [myEvents, setMyEvents] = useState([]);
   const [viewMode, setViewMode] = useState("current");
   const [isSwitchMoving, setIsSwitchMoving] = useState(false);
@@ -38,10 +40,9 @@ export default function MyEvents() {
             <div className="my-events-static">
               <section className="dashboard-org-events-header">
                 <div className="dashboard-org-events-copyblock">
-                  <p className="dashboard-org-hero-eyebrow">Organization events</p>
-                  <h1 className="dashboard-org-events-title">My Events</h1>
+                  <h1 className="dashboard-org-events-title">{t("My Events")}</h1>
                   <p className="dashboard-org-events-copy">
-                    Access every event you have created, review registration volume, and jump into details.
+                    {t("Access every event you have created, review registration volume, and jump into details.")}
                   </p>
                 </div>
                 <button
@@ -50,16 +51,15 @@ export default function MyEvents() {
                   onClick={() => navigate("/events/create")}
                 >
                   <Plus size={15} />
-                  Create New Event
+                  {t("Create New Event")}
                 </button>
               </section>
 
               <div className="my-events-toolbar">
                 <div
-                  className={`my-events-view-switch${isSwitchMoving ? " my-events-view-switch--moving" : ""}`}
+                  className={`my-events-view-switch${isSwitchMoving ? " my-events-view-switch--moving" : ""}${viewMode === "history" ? " my-events-view-switch--history" : ""}`}
                   role="tablist"
-                  aria-label="Event history filter"
-                  style={{ "--active-index": viewMode === "history" ? 1 : 0 }}
+                  aria-label={t("Event history filter")}
                 >
                   <span className="my-events-view-indicator" aria-hidden="true" />
                   <button
@@ -67,92 +67,80 @@ export default function MyEvents() {
                     className={`my-events-view-btn${viewMode === "current" ? " my-events-view-btn--active" : ""}`}
                     onClick={() => setViewMode("current")}
                   >
-                    Current Events
+                    {t("Current Events")}
                   </button>
                   <button
                     type="button"
                     className={`my-events-view-btn${viewMode === "history" ? " my-events-view-btn--active" : ""}`}
                     onClick={() => setViewMode("history")}
                   >
-                    History
+                    {t("History")}
                   </button>
                 </div>
               </div>
             </div>
 
             {visibleEvents.length === 0 ? (
-              <div className="dashboard-empty my-events-empty">
+                <div className="dashboard-empty my-events-empty">
                 <p className="dashboard-empty-copy">
                   {viewMode === "history"
-                    ? "No past events yet."
-                    : "You have not created any current events yet."}
+                    ? t("No past events yet.")
+                    : t("You have not created any current events yet.")}
                 </p>
                 {viewMode === "current" && (
                   <button className="btn btn-primary" onClick={() => navigate("/events/create")}>
-                    Create your first event
+                    {t("Create your first event")}
                   </button>
                 )}
               </div>
             ) : (
               <div className="dashboard-list-scroll my-events-list-scroll">
-                <div className="dashboard-list">
+                <ul className="dashboard-list collection-list">
                   {visibleEvents.map((ev) => (
-                    <div
-                      key={ev.id}
-                      onClick={() => navigate(`/events/${ev.id}`)}
-                      className="dashboard-registration-item"
-                    >
-                      <div className="dashboard-registration-info">
-                        <p className="dashboard-registration-title">{ev.title}</p>
-                        <p className="dashboard-registration-organizer">
-                          {ev.organizer || "Your organization"}
-                        </p>
-                        <div className="dashboard-registration-meta">
-                          {ev.date && (
-                            <span className="dashboard-registration-meta-item">{ev.date}</span>
-                          )}
-                          {ev.location && (
-                            <span className="dashboard-registration-meta-item">{ev.location}</span>
-                          )}
-                          <span className="dashboard-registration-meta-item">
-                            {ev.registered_count || 0}/{ev.max_participants || 0} registered
-                          </span>
-                          {(ev.tags || []).slice(0, 2).map((tag) => (
-                            <span key={tag} className="dashboard-registration-tag">
-                              #{tag}
+                    <li key={ev.id} className="collection-list__item">
+                      <div
+                        onClick={() => navigate(`/events/${ev.id}`)}
+                        className="dashboard-registration-item"
+                      >
+                        <div className="dashboard-registration-info">
+                          <p className="dashboard-registration-title">{ev.title}</p>
+                          <p className="dashboard-registration-organizer">
+                            {ev.organizer || t("Your organization")}
+                          </p>
+                          <div className="dashboard-registration-meta">
+                            {ev.date && (
+                              <span className="dashboard-registration-meta-item">{ev.date}</span>
+                            )}
+                            {ev.location && (
+                              <span className="dashboard-registration-meta-item">{ev.location}</span>
+                            )}
+                            <span className="dashboard-registration-meta-item">
+                              {ev.unlimited_capacity
+                                ? t("{{count}} registered", { count: ev.registered_count || 0 })
+                                : t("{{count}} / {{max}} registered", {
+                                    count: ev.registered_count || 0,
+                                    max: ev.max_participants || 0,
+                                  })}
                             </span>
-                          ))}
+                            {(ev.tags || []).slice(0, 2).map((tag) => (
+                              <span key={tag} className="dashboard-registration-tag">
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="dashboard-registration-right">
+                          <span
+                            className={`dashboard-org-event-status dashboard-org-event-status--${ev.status || "upcoming"}`}
+                          >
+                            {t(ev.status_label || ev.status)}
+                          </span>
                         </div>
                       </div>
-
-                      <div className="dashboard-registration-right">
-                        <span
-                          className="dashboard-org-event-status"
-                          style={{
-                            background:
-                              ev.status === "cancelled"
-                                ? "rgba(255, 77, 77, 0.1)"
-                                : ev.status === "live"
-                                  ? "rgba(16, 185, 129, 0.12)"
-                                  : ev.status === "past"
-                                    ? "rgba(255, 255, 255, 0.06)"
-                                    : "rgba(0, 229, 255, 0.1)",
-                            color:
-                              ev.status === "cancelled"
-                                ? "var(--error)"
-                                : ev.status === "live"
-                                  ? "var(--success)"
-                                  : ev.status === "past"
-                                    ? "var(--text-muted)"
-                                    : "var(--accent)",
-                          }}
-                        >
-                          {ev.status_label || ev.status}
-                        </span>
-                      </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
           </div>

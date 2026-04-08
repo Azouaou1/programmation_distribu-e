@@ -33,16 +33,22 @@ router.post('/password-reset/confirm/', ctrl.passwordResetConfirm);
 // ─── Vérification document ───────────────────────────────────────────────────
 router.patch('/me/verification/document/', authenticate, uploadDocument, ctrl.uploadVerificationDocument);
 
-// ─── Admin — Statistiques ─────────────────────────────────────────────────────
+
+// ─── Profil public participant ────────────────────────────────────────
+router.get('/participants/:id/', authenticate, ctrl.getParticipantPublicProfile);
+
+// ─── Admin — Statistiques ─────────────────────────────────────────
 router.get('/admin/stats/', authenticate, requireAdmin, ctrl.adminStats);
 
-// ─── Admin — Utilisateurs ────────────────────────────────────────────────────
+// ─── Admin — Utilisateurs ────────────────────────────────────────
 router.get('/admin/users/', authenticate, requireAdmin, ctrl.adminListUsers);
+router.get('/admin/users/:id/', authenticate, requireAdmin, ctrl.adminGetUser);
 router.patch('/admin/users/:id/suspend/', authenticate, requireAdmin, ctrl.adminSuspendUser);
 router.patch('/admin/users/:id/activate/', authenticate, requireAdmin, ctrl.adminActivateUser);
 router.delete('/admin/users/:id/delete/', authenticate, requireAdmin, ctrl.adminDeleteUser);
 
-// ─── Admin — Vérification companies ─────────────────────────────────────────
+// ─── Admin — Companies ──────────────────────────────────────────────────
+router.get('/admin/companies/', authenticate, requireAdmin, ctrl.adminListCompanies);
 router.get('/admin/companies/pending/', authenticate, requireAdmin, ctrl.adminPendingCompanies);
 router.patch('/admin/companies/:id/verify/', authenticate, requireAdmin, ctrl.adminVerifyCompany);
 

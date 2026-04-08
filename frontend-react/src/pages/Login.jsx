@@ -5,23 +5,26 @@ import "../styles/Login.css";
 import { loginParticipantApi, loginCompanyApi } from "../api/auth";
 import { decodeJWT } from "../api/client";
 import { setToken, setRefreshToken, setRole, setUsername, setDisplayName, setCompanyName, setUserId } from "../store/authStore";
+import { usePreferences } from "../context/PreferencesContext";
+import AuthPageShell from "../components/AuthPageShell";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState("researcher"); // "researcher" | "lab"
+  const { t } = usePreferences();
+  const [mode, setMode] = useState("participant");
   const [form, setForm] = useState({ credential: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const isLab = mode === "lab";
+  const isOrganization = mode === "organization";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const data = isLab
+      const data = isOrganization
         ? await loginCompanyApi(form.credential, form.password)
         : await loginParticipantApi(form.credential, form.password);
       // Le vrai backend renvoie seulement {access, refresh} — le role et l'identifiant
@@ -39,7 +42,7 @@ export default function Login() {
       setDisplayName(displayName);
       if (payload?.company_name) setCompanyName(payload.company_name);
       if (payload?.user_id) setUserId(payload.user_id);
-      navigate("/dashboard");
+      navigate(role === "ADMIN" ? "/admin/participants" : "/dashboard");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -48,74 +51,59 @@ export default function Login() {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-top-brand">
-        <div className="app-header__inner login-top-brand__inner">
-          <Link to="/" className="app-header__brand login-brand">
-            Neuro<span style={{ color: "var(--accent)" }}>vent</span>
-          </Link>
-          <div aria-hidden="true" />
-          <div aria-hidden="true" />
-        </div>
-      </div>
-
-      <div className="login-shell">
+    <AuthPageShell
+      pageClassName="login-page"
+      controlsClassName="login-top-brand__controls"
+      brandClassName="login-brand"
+      brandMarkClassName="login-brand-mark"
+      contentClassName="login-shell"
+      lockViewport={false}
+    >
       <div className="login-mode-selector">
         <span
-          className={`login-mode-slider${isLab ? " login-mode-slider--lab" : ""}`}
+          className={`login-mode-slider${isOrganization ? " login-mode-slider--lab" : ""}`}
           aria-hidden="true"
         />
         {[
-          { key: "researcher", label: "Participant" },
-          { key: "lab", label: "Organization" },
+          { key: "participant", label: t("Participant") },
+          { key: "organization", label: t("Organization") },
         ].map((m) => (
           <button
             key={m.key}
             onClick={() => { setMode(m.key); setError(""); }}
-            className="login-mode-btn"
-            style={{
-              color: mode === m.key ? (m.key === "lab" ? "#fff" : "#000") : "var(--text-muted)",
-            }}
+            className={`login-mode-btn login-mode-btn--${m.key}${mode === m.key ? " login-mode-btn--active" : ""}`}
           >
             {m.label}
           </button>
         ))}
       </div>
 
-      <div
-        className="login-card"
-        style={{
-          background: "var(--surface)",
-          border: `1px solid ${isLab ? "var(--secondary)" : "var(--border-strong)"}`,
-          boxShadow: isLab
-            ? "0 0 40px rgba(168,85,247,0.08)"
-            : "0 0 40px rgba(0,0,0,0.4)",
-        }}
-      >
-        <h2 className="login-title" style={{ textAlign: "center", marginBottom: "10px" }}>
-          {isLab ? "Company Console" : "Welcome Back"}
-        </h2>
-        <p className="login-subtitle" style={{ textAlign: "center", marginBottom: "36px" }}>
-          {isLab
-            ? "Manage your events, registrations and verification workflow."
-            : "Sign in to manage your event registrations and discover new opportunities."}
-        </p>
+      <div className={`login-card${isOrganization ? " login-card--organization" : ""}`}>
+        <div className="login-heading">
+          <h2 className={`login-title${isOrganization ? " login-title--organization" : ""}`}>
+            {isOrganization ? t("Organization Login") : t("Participant Login")}
+          </h2>
+          <p className="login-subtitle">
+            {isOrganization
+              ? t("Manage your events, registrations and verification workflow.")
+              : t("Sign in to manage your event registrations and discover new opportunities.")}
+          </p>
+        </div>
 
         {error && (
           <div className="login-error">
-            <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+            <AlertCircle size={16} className="icon-inline-start" />
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-field">
-            <label className="form-label">{isLab ? "Company Identifier" : "Email Address"}</label>
+            <label className="form-label">{isOrganization ? t("Company Identifier") : t("Email Address")}</label>
             <input
               type="text"
-              className="input"
-              style={{ height: "54px" }}
-              placeholder={isLab ? "your-lab-identifier" : "researcher@institution.edu"}
+              className="input login-input"
+              placeholder={isOrganization ? t("your-organization-identifier") : t("participant@institution.edu")}
               value={form.credential}
               onChange={(e) => setForm({ ...form, credential: e.target.value })}
               required
@@ -124,21 +112,15 @@ export default function Login() {
 
           <div className="form-field">
             <div className="login-password-row">
-              <label className="form-label" style={{ marginBottom: 0 }}>{isLab ? "Security Key" : "Password"}</label>
-              {!isLab && (
-                <Link
-                  to="/forgot-password"
-                  className="login-forgot-link"
-                >
-                  Forgot password?
-                </Link>
-              )}
+              <label className="form-label login-password-label">{t("Password")}</label>
+              <Link to="/forgot-password" className="login-forgot-link">
+                {t("Forgot password?")}
+              </Link>
             </div>
-            <div style={{ position: "relative" }}>
+            <div className="login-password-field">
               <input
                 type={showPassword ? "text" : "password"}
-                className="input"
-                style={{ height: "54px", paddingRight: "48px" }}
+                className="input login-password-input"
                 placeholder="••••••••"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
@@ -147,19 +129,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: "absolute",
-                  right: "16px",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  color: "var(--text-dim)",
-                  cursor: "pointer",
-                  padding: 0,
-                  display: "flex",
-                  alignItems: "center",
-                }}
+                className="login-password-toggle"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -168,41 +138,24 @@ export default function Login() {
 
           <button
             type="submit"
-            className="btn"
-            style={{
-              width: "100%",
-              height: "54px",
-              marginTop: "8px",
-              borderRadius: "10px",
-              fontSize: "16px",
-              fontWeight: "700",
-              background: isLab ? "var(--secondary)" : "var(--accent)",
-              color: isLab ? "#fff" : "#000",
-              border: "none",
-              cursor: loading ? "not-allowed" : "pointer",
-              opacity: loading ? 0.7 : 1,
-              transition: "var(--transition)",
-            }}
+            className={`btn login-submit${isOrganization ? " login-submit--organization" : ""}`}
             disabled={loading}
           >
             {loading
-              ? "Connecting..."
-              : isLab
-              ? "Access Lab Dashboard"
-              : "Sign In to Dashboard"}
+              ? t("Connecting...")
+              : isOrganization
+                ? t("Access Organization Dashboard")
+                : t("Sign In to Dashboard")}
           </button>
         </form>
 
         <p className="login-footer">
-          {isLab ? "Not a lab?" : "No account yet?"}{" "}
-          <Link
-            to="/register"
-          >
-            {isLab ? "Researcher signup" : "Register now"}
+          {isOrganization ? t("Not an organization?") : t("No account yet?")}{" "}
+          <Link to="/register">
+            {isOrganization ? t("Participant sign up") : t("Register now")}
           </Link>
         </p>
       </div>
-      </div>
-    </div>
+    </AuthPageShell>
   );
 }

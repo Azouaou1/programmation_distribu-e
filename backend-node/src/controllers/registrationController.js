@@ -4,9 +4,12 @@ const { Op } = require('sequelize');
 const { Registration, Event, User } = require('../models');
 const {
   sendRegistrationConfirmed,
+  sendRegistrationPending,
+  sendRegistrationWaitlist,
   sendRegistrationRejected,
   sendRegistrationRemovedByOrganizer,
 } = require('../services/emailService');
+const { notifyEventCapacityMilestones } = require('../utils/notificationUtils');
 
 // ─── Helper — Promotion liste d'attente ──────────────────────────────────────
 
@@ -125,21 +128,7 @@ async function registerToEvent(req, res) {
     });
   }
 
-  // Notifier si confirmation immédiate
-  if (newStatus === 'CONFIRMED') {
-    await registration.reload({
-      include: [
-        { association: 'participant', attributes: ['id', 'email', 'first_name', 'last_name'] },
-        {
-          association: 'event',
-          include: [{ association: 'company', attributes: ['company_name'] }],
-        },
-      ],
-    });
-    sendRegistrationConfirmed(registration, false).catch(() => {});
-  }
-
-  // Calcul de la position dans la liste d'attente
+  // Calculer la position dans la liste d'attente
   let waitlistPosition = null;
   if (newStatus === 'WAITLIST') {
     waitlistPosition = await Registration.count({
@@ -150,6 +139,30 @@ async function registerToEvent(req, res) {
       },
     }) + 1;
   }
+
+  // Notifier le participant selon le statut
+  await registration.reload({
+    include: [
+      { association: 'participant', attributes: ['id', 'email', 'first_name', 'last_name'] },
+      {
+        association: 'event',
+        include: [{ association: 'company', attributes: ['company_name'] }],
+      },
+    ],
+  });
+  if (newStatus === 'CONFIRMED') {
+    sendRegistrationConfirmed(registration, false).catch(() => {});
+  } else if (newStatus === 'PENDING') {
+    sendRegistrationPending(registration).catch(() => {});
+  } else if (newStatus === 'WAITLIST') {
+    sendRegistrationWaitlist(registration, waitlistPosition).catch(() => {});
+  }
+
+  // Alertes de capacité organisateur
+  const eventWithCompany = await Event.findByPk(event.id, {
+    include: [{ association: 'company', attributes: ['id', 'company_name', 'recovery_email'] }],
+  });
+  notifyEventCapacityMilestones(eventWithCompany).catch(() => {});
 
   return res.status(201).json({
     id: registration.id,
@@ -233,6 +246,12 @@ async function cancelRegistration(req, res) {
 
   // Promouvoir le premier en liste d'attente
   await promoteFromWaitlist(registration.event);
+
+  // Alertes de capacité organisateur
+  const eventForCapacity = await Event.findByPk(registration.event_id, {
+    include: [{ association: 'company', attributes: ['id', 'company_name', 'recovery_email'] }],
+  });
+  notifyEventCapacityMilestones(eventForCapacity).catch(() => {});
 
   return res.json({ id: registration.id, status: registration.status });
 }
@@ -339,6 +358,12 @@ async function updateRegistrationStatus(req, res) {
     await promoteFromWaitlist(registration.event);
   }
 
+  // Alertes de capacité organisateur
+  const eventForCapacity2 = await Event.findByPk(registration.event.id, {
+    include: [{ association: 'company', attributes: ['id', 'company_name', 'recovery_email'] }],
+  });
+  notifyEventCapacityMilestones(eventForCapacity2).catch(() => {});
+
   return res.json({ id: registration.id, status: registration.status, company_comment: registration.company_comment });
 }
 
@@ -380,6 +405,12 @@ async function removeRegistration(req, res) {
 
   sendRegistrationRemovedByOrganizer(registration).catch(() => {});
   await promoteFromWaitlist(registration.event);
+
+  // Alertes de capacité organisateur
+  const eventForCapacity3 = await Event.findByPk(registration.event.id, {
+    include: [{ association: 'company', attributes: ['id', 'company_name', 'recovery_email'] }],
+  });
+  notifyEventCapacityMilestones(eventForCapacity3).catch(() => {});
 
   return res.status(204).send();
 }

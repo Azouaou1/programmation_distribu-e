@@ -49,6 +49,54 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(200),
     defaultValue: '',
   },
+  participant_profile_type: {
+    type: DataTypes.ENUM('STUDENT', 'PROFESSIONAL'),
+    defaultValue: 'STUDENT',
+  },
+  school_name: {
+    type: DataTypes.STRING(200),
+    defaultValue: '',
+  },
+  study_level: {
+    type: DataTypes.STRING(120),
+    defaultValue: '',
+  },
+  professional_company_name: {
+    type: DataTypes.STRING(200),
+    defaultValue: '',
+  },
+  job_title: {
+    type: DataTypes.STRING(200),
+    defaultValue: '',
+  },
+  job_started_at: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+  },
+  participant_avatar_url: {
+    type: DataTypes.STRING(500),
+    defaultValue: '',
+  },
+  participant_bio: {
+    type: DataTypes.TEXT,
+    defaultValue: '',
+  },
+  favorite_domain: {
+    type: DataTypes.STRING(200),
+    defaultValue: '',
+  },
+  personal_website_url: {
+    type: DataTypes.STRING(500),
+    defaultValue: '',
+  },
+  github_url: {
+    type: DataTypes.STRING(500),
+    defaultValue: '',
+  },
+  participant_linkedin_url: {
+    type: DataTypes.STRING(500),
+    defaultValue: '',
+  },
 
   // ─── Company ─────────────────────────────────────────────────────────
   company_identifier: {
@@ -71,6 +119,10 @@ const User = sequelize.define('User', {
   company_logo: {
     type: DataTypes.STRING,
     allowNull: true,
+  },
+  company_logo_url: {
+    type: DataTypes.STRING(500),
+    defaultValue: '',
   },
   company_description: {
     type: DataTypes.TEXT,

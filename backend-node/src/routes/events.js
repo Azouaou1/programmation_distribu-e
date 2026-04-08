@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, optionalAuthenticate } = require('../middleware/auth');
-const { requireCompany, requireAuthenticated, requireCompanyOrAdmin } = require('../middleware/permissions');
+const { requireCompany, requireAuthenticated, requireCompanyOrAdmin, requireAdmin } = require('../middleware/permissions');
 const { uploadBanner } = require('../middleware/upload');
 const ctrl = require('../controllers/eventController');
 
@@ -15,6 +15,11 @@ router.get('/my-events/', authenticate, requireCompany, ctrl.myEvents);
 router.get('/dashboard-stats/', authenticate, requireCompanyOrAdmin, ctrl.dashboardStats);
 router.get('/dashboard-stats/export-summary/', authenticate, requireCompanyOrAdmin, ctrl.exportDashboardSummary);
 router.get('/dashboard-stats/export-performance/', authenticate, requireCompanyOrAdmin, ctrl.exportDashboardPerformance);
+
+// ─── Routes admin events ──────────────────────────────────────────────────────
+router.get('/admin/', authenticate, requireAdmin, ctrl.adminListEvents);
+router.get('/admin/:id/', authenticate, requireAdmin, ctrl.adminGetEvent);
+router.delete('/admin/:id/delete/', authenticate, requireAdmin, ctrl.adminDeleteEvent);
 
 // ─── CRUD events ─────────────────────────────────────────────────────────────
 router.get('/', optionalAuthenticate, ctrl.listEvents);

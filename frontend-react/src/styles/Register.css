@@ -1,15 +1,28 @@
 /* ===== REGISTER PAGE ===== */
 
 .register-page {
-  min-height: 100vh;
-  background: var(--bg-deep);
+  height: 100dvh;
+}
+
+.register-top-brand__controls {
+  justify-self: end;
+}
+
+.register-body {
+  position: absolute;
+  top: var(--auth-header-height);
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
+  min-height: 0;
+  height: auto;
 }
 
 .register-left {
   width: min(42%, 540px);
   min-width: 340px;
-  background: linear-gradient(180deg, rgba(12,16,32,0.96) 0%, rgba(5,8,16,0.98) 100%);
+  background: var(--auth-side-bg);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -25,16 +38,27 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 420px 320px at 0% 30%, rgba(0,240,200,0.08) 0%, transparent 72%),
-    radial-gradient(ellipse 340px 260px at 85% 85%, rgba(255,200,80,0.05) 0%, transparent 75%);
+    radial-gradient(ellipse 420px 320px at 0% 30%, var(--auth-side-glow-primary) 0%, transparent 72%),
+    radial-gradient(ellipse 340px 260px at 85% 85%, var(--auth-side-glow-secondary) 0%, transparent 75%);
 }
 
 .register-brand {
   text-decoration: none;
+}
+
+.register-brand-mark {
+  color: var(--accent);
+}
+
+.register-brand--side {
   position: absolute;
   top: clamp(1.2rem, 3vw, 2.5rem);
   left: clamp(1.2rem, 3vw, 3.5rem);
   z-index: 1;
+}
+
+.register-brand--header {
+  position: static;
 }
 
 .register-brand-text {
@@ -68,6 +92,10 @@
   line-height: 1.75;
 }
 
+:root[data-theme="light"] .register-left-desc {
+  color: #41566f;
+}
+
 .register-left-features {
   display: flex;
   flex-direction: column;
@@ -85,6 +113,10 @@
   line-height: 1.65;
 }
 
+:root[data-theme="light"] .register-left-feature {
+  color: #526781;
+}
+
 .register-left-feature-dot {
   width: 8px;
   height: 8px;
@@ -97,18 +129,26 @@
 
 .register-right {
   flex: 1;
-  min-height: 100vh;
-  padding: clamp(1.5rem, 4vw, 3.75rem);
+  min-height: 0;
+  height: 100%;
+  padding: 0 clamp(1.5rem, 4vw, 3.75rem) clamp(1.5rem, 4vw, 3.75rem);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   background: var(--surface);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .register-form-wrap {
   width: 100%;
   max-width: 540px;
+  flex: 0 0 auto;
+  margin: auto;
+  padding-top: 20px;
+  padding-bottom: 24px;
 }
 
 .register-tab-switcher {
@@ -142,6 +182,10 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.register-section {
+  margin-bottom: 32px;
 }
 
 .register-error {
@@ -229,6 +273,20 @@
   position: relative;
 }
 
+.register-password-input {
+  padding-right: 48px;
+}
+
+.register-password-input--match {
+  border-color: var(--success);
+  box-shadow: 0 0 0 1px var(--success);
+}
+
+.register-password-input--error {
+  border-color: var(--error);
+  box-shadow: 0 0 0 1px var(--error);
+}
+
 .register-password-toggle {
   position: absolute;
   right: 14px;
@@ -254,6 +312,12 @@
 
 .register-match--ok { color: var(--success); }
 .register-match--error { color: var(--error); }
+
+.register-tag-btn--selected {
+  border-color: var(--accent);
+  background: rgba(0,229,255,0.1);
+  color: var(--accent);
+}
 
 .register-submit {
   width: 100%;
@@ -322,34 +386,81 @@
 }
 
 /* ===== RESPONSIVE ===== */
-@media (max-width: 1024px) {
-  .register-page {
-    flex-direction: column;
+@media (max-width: 920px) {
+  .register-body {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .register-left {
-    width: 100%;
-    min-width: 0;
-    min-height: auto;
-    padding-top: 84px;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .register-left-features {
-    margin-top: 28px;
+    display: none;
   }
 
   .register-right {
-    min-height: auto;
+    width: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+    justify-content: flex-start;
+    padding-left: clamp(1.25rem, 4vw, 2.5rem);
+    padding-right: clamp(1.25rem, 4vw, 2.5rem);
+    padding-top: 24px;
+    padding-bottom: 36px;
+    overflow: visible;
+  }
+
+  .register-form-wrap {
+    margin: 0 auto;
+    padding-top: 12px;
+    padding-bottom: 16px;
+  }
+}
+
+@media (max-height: 700px) {
+  .register-body {
+    display: block;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .register-left {
+    display: none;
+  }
+
+  .register-right {
+    width: 100%;
+    min-height: 0;
+    height: auto;
+    justify-content: flex-start;
+    padding-top: 20px;
+    padding-bottom: 28px;
+    overflow: visible;
   }
 }
 
 @media (max-width: 640px) {
   .register-right,
   .register-left {
-    padding-left: var(--page-gutter);
-    padding-right: var(--page-gutter);
+    padding-left: max(var(--page-gutter), 16px);
+    padding-right: max(var(--page-gutter), 16px);
+  }
+
+  .register-right {
+    min-height: 0;
+    height: auto;
+    justify-content: flex-start;
+    padding-top: 0;
+    padding-bottom: 28px;
+    overflow-y: auto;
+  }
+
+  .register-form-wrap {
+    max-width: none;
+    margin: 0 auto;
+    padding: 20px 4px 24px;
   }
 
   .register-form-row {
@@ -363,7 +474,7 @@
 }
 
 @media (max-width: 430px) {
-  .register-brand {
+  .register-brand--side {
     top: 16px;
     left: 16px;
   }
@@ -373,12 +484,13 @@
   }
 
   .register-left-title {
-    font-size: clamp(2rem, 10vw, 2.7rem);
+    font-size: clamp(1.8rem, 9vw, 2.35rem);
   }
 
   .register-left-desc,
   .register-note {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
+    line-height: 1.55;
   }
 
   .register-submit {

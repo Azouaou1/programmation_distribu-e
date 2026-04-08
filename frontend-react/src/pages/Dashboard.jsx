@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { Calendar, X } from "lucide-react";
 import { getRole, getDisplayName, getCompanyName } from "../store/authStore";
 import {
@@ -8,6 +8,7 @@ import {
   getCompanyDashboardStats,
 } from "../api/events";
 import { getMyRegistrations, cancelRegistration } from "../api/registrations";
+import { usePreferences } from "../context/PreferencesContext";
 import "../styles/Dashboard.css";
 
 // ---- Shared shell ----
@@ -81,7 +82,7 @@ function UserDashboard() {
     if (key === "settings") navigate("/profile");
   };
 
-  const displayName = getDisplayName() || "Researcher";
+  const displayName = getDisplayName() || "Participant";
 
   const activeRegs = registrations.filter((r) => r.status !== "CANCELLED" && r.status !== "REJECTED");
   const visibleRegs = activeRegs.filter((r) => statusFilter === "ALL" ? true : r.status === statusFilter);
@@ -107,7 +108,7 @@ function UserDashboard() {
       navItems={navItems}
       activeSection="dashboard"
       onNav={handleNav}
-      topTitle="Researcher Dashboard"
+      topTitle="Participant Dashboard"
       topAction={null}
       showTopbar={false}
       contentClassName="dashboard-content--fixed-shell"
@@ -116,16 +117,16 @@ function UserDashboard() {
         <div className="dashboard-user-static">
           <div className="dashboard-welcome">
             <h1 className="dashboard-welcome-title">
-              Welcome back, <span style={{ color: "var(--accent)" }}>{displayName.split(" ")[0]}</span>
+              Welcome back, <span className="text-accent">{displayName.split(" ")[0]}</span>
             </h1>
             <p className="dashboard-welcome-copy">
               Explore upcoming scientific events and manage your registrations.
             </p>
         <div className="dashboard-inline-stats">
           {[
-            { key: "CONFIRMED", label: "Confirmed", value: confirmedCount, color: "var(--success)" },
-            { key: "PENDING", label: "Pending", value: pendingCount, color: "#f5c400" },
-            { key: "WAITLIST", label: "Waitlist", value: waitlistCount, color: "var(--accent)" },
+            { key: "CONFIRMED", label: "Confirmed", value: confirmedCount, tone: "success" },
+            { key: "PENDING", label: "Pending", value: pendingCount, tone: "warning" },
+            { key: "WAITLIST", label: "Waitlist", value: waitlistCount, tone: "accent" },
           ].map((s) => (
             <button
               key={s.label}
@@ -134,7 +135,7 @@ function UserDashboard() {
               onClick={() => setStatusFilter((prev) => prev === s.key ? "ALL" : s.key)}
             >
               <p className="dashboard-inline-stat-label">{s.label}</p>
-              <p className="dashboard-inline-stat-value" style={{ color: s.color }}>{s.value}</p>
+              <p className={`dashboard-inline-stat-value dashboard-inline-stat-value--${s.tone}`}>{s.value}</p>
             </button>
           ))}
           <button
@@ -160,90 +161,94 @@ function UserDashboard() {
           </div>
         ) : (
           <div className="dashboard-list-scroll">
-            <div className="dashboard-list">
+            <ul className="dashboard-list collection-list">
               {visibleRegs.map((reg) => {
-            const eventData = typeof reg.event === "object" ? reg.event : null;
-            const eventId = eventData ? eventData.id : reg.event;
-            const title = reg.event_title || eventData?.title || `Event #${eventId}`;
-            const date = reg.event_date ? reg.event_date.split("T")[0] : "";
-            const organizer = reg.event_organizer || eventData?.organizer || "";
-            const format = eventData?.format;
-            const city = eventData?.city;
-            const country = eventData?.country;
-            const tags = (eventData?.tags || []).slice(0, 2).map((tag) => (typeof tag === "object" ? tag.name : tag));
-            const registrationDate = formatShortDate(reg.created_at);
-            const statusColor =
-              reg.status === "CONFIRMED" ? { bg: "rgba(0,255,149,0.1)", text: "var(--success)" }
-              : reg.status === "WAITLIST" ? { bg: "rgba(168,85,247,0.1)", text: "var(--secondary)" }
-              : { bg: "rgba(245,196,0,0.1)", text: "#f5c400" };
+                const eventData = typeof reg.event === "object" ? reg.event : null;
+                const eventId = eventData ? eventData.id : reg.event;
+                const title = reg.event_title || eventData?.title || `Event #${eventId}`;
+                const date = reg.event_date ? reg.event_date.split("T")[0] : "";
+                const organizer = reg.event_organizer || eventData?.organizer || "";
+                const format = eventData?.format;
+                const city = eventData?.city;
+                const country = eventData?.country;
+                const tags = (eventData?.tags || []).slice(0, 2).map((tag) => (typeof tag === "object" ? tag.name : tag));
+                const registrationDate = formatShortDate(reg.created_at);
+                const statusTone =
+                  reg.status === "CONFIRMED" ? "confirmed"
+                  : reg.status === "WAITLIST" ? "waitlist"
+                  : "pending";
 
                 return (
-                  <div
-                    key={reg.id}
-                    onClick={() => navigate(`/events/${eventId}`)}
-                    className="dashboard-registration-item"
-                  >
-                    <div className="dashboard-registration-info">
-                      <h3 className="dashboard-registration-title">{title}</h3>
-                      {organizer && (
-                        <p className="dashboard-registration-organizer">{organizer}</p>
-                      )}
-                      <div className="dashboard-registration-meta">
-                        {(format || city || date) && (
-                          <span className="dashboard-registration-meta-item">
-                            <span className="dashboard-registration-meta-bullet">•</span>
-                            {format === "online"
-                              ? "Online Session"
-                              : city
-                                ? `${city}${country ? `, ${country}` : ""}`
-                                : format === "hybrid"
-                                  ? "Hybrid Event"
-                                  : "In-Person Event"}
-                          </span>
+                  <li key={reg.id} className="collection-list__item">
+                    <div
+                      onClick={() => navigate(`/events/${eventId}`, {
+                        state: {
+                          fromDashboard: "/dashboard",
+                        },
+                      })}
+                      className="dashboard-registration-item"
+                    >
+                      <div className="dashboard-registration-info">
+                        <h3 className="dashboard-registration-title">{title}</h3>
+                        {organizer && (
+                          <p className="dashboard-registration-organizer">{organizer}</p>
                         )}
-                        {date && (
-                          <span className="dashboard-registration-meta-item">
-                            <Calendar size={14} /> {date}
-                          </span>
-                        )}
-                        {tags.map((tag) => (
-                          <span key={tag} className="dashboard-registration-tag">
-                            #{tag}
-                          </span>
-                        ))}
+                        <div className="dashboard-registration-meta">
+                          {(format || city || date) && (
+                            <span className="dashboard-registration-meta-item">
+                              <span className="dashboard-registration-meta-bullet">•</span>
+                              {format === "online"
+                                ? "Online Session"
+                                : city
+                                  ? `${city}${country ? `, ${country}` : ""}`
+                                  : format === "hybrid"
+                                    ? "Hybrid Event"
+                                    : "In-Person Event"}
+                            </span>
+                          )}
+                          {date && (
+                            <span className="dashboard-registration-meta-item">
+                              <Calendar size={14} /> {date}
+                            </span>
+                          )}
+                          {tags.map((tag) => (
+                            <span key={tag} className="dashboard-registration-tag">
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                        <div className="dashboard-registration-submeta">
+                          {registrationDate && (
+                            <span className="dashboard-registration-submeta-item">
+                              Registered on {registrationDate}
+                            </span>
+                          )}
+                          {reg.status === "WAITLIST" && reg.waitlist_position ? (
+                            <span className="dashboard-registration-submeta-item">
+                              Waitlist position #{reg.waitlist_position}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                      <div className="dashboard-registration-submeta">
-                        {registrationDate && (
-                          <span className="dashboard-registration-submeta-item">
-                            Registered on {registrationDate}
-                          </span>
-                        )}
-                        {reg.status === "WAITLIST" && reg.waitlist_position ? (
-                          <span className="dashboard-registration-submeta-item">
-                            Waitlist position #{reg.waitlist_position}
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
 
-                    <div className="dashboard-registration-right">
-                      <span className="dashboard-status-badge" style={{ background: statusColor.bg, color: statusColor.text }}>
-                        {reg.status === "CONFIRMED" ? "Confirmed" : reg.status === "WAITLIST" ? "Waitlist" : "Pending"}
-                      </span>
-                      <button
-                        onClick={(e) => handleCancel(e, reg.id)}
-                        disabled={cancelling === reg.id}
-                        title="Cancel registration"
-                        className="dashboard-icon-btn"
-                        style={{ opacity: cancelling === reg.id ? 0.5 : 1 }}
-                      >
-                        <X size={14} />
-                      </button>
+                      <div className="dashboard-registration-right">
+                        <span className={`dashboard-status-badge dashboard-status-badge--${statusTone}`}>
+                          {reg.status === "CONFIRMED" ? "Confirmed" : reg.status === "WAITLIST" ? "Waitlist" : "Pending"}
+                        </span>
+                        <button
+                          onClick={(e) => handleCancel(e, reg.id)}
+                          disabled={cancelling === reg.id}
+                          title="Cancel registration"
+                          className={`dashboard-icon-btn${cancelling === reg.id ? " dashboard-icon-btn--disabled" : ""}`}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </div>
         )}
       </div>
@@ -253,6 +258,7 @@ function UserDashboard() {
 
 // ---- ORG DASHBOARD ----
 function OrgDashboard() {
+  const { t } = usePreferences();
   const [dashboardStats, setDashboardStats] = useState({
     total_views: 0,
     total_registrations: 0,
@@ -265,7 +271,7 @@ function OrgDashboard() {
     cancellation_rate: 0,
   });
 
-  const orgName = getCompanyName() || getDisplayName() || "Lab";
+  const orgName = getCompanyName() || getDisplayName() || t("Organization");
   useEffect(() => {
     getCompanyDashboardStats().then(setDashboardStats).catch(console.error);
   }, []);
@@ -340,10 +346,9 @@ function OrgDashboard() {
       <div className="dashboard-org-layout">
         <section className="dashboard-org-hero">
           <div className="dashboard-org-hero-copyblock">
-            <p className="dashboard-org-hero-eyebrow">Organization dashboard</p>
             <h1 className="dashboard-org-hero-title">{orgName}</h1>
             <p className="dashboard-org-hero-copy">
-              A global view of your event activity, registrations, and overall publishing performance.
+              {t("A global view of your event activity, registrations, and overall publishing performance.")}
             </p>
           </div>
         </section>
@@ -351,11 +356,11 @@ function OrgDashboard() {
         <section className="dashboard-org-stats-grid">
           {statCards.map((stat) => (
             <article key={stat.label} className="dashboard-org-stat-card">
-              <p className="dashboard-org-stat-label">{stat.label}</p>
-              <p className="dashboard-org-stat-value" style={{ color: stat.accent }}>
+              <p className="dashboard-org-stat-label">{t(stat.label)}</p>
+              <p className={`dashboard-org-stat-value ${stat.accent === "var(--success)" ? "text-success" : stat.accent === "var(--accent)" ? "text-accent" : stat.accent === "var(--secondary)" ? "text-secondary" : stat.accent === "#f5c400" ? "text-warning" : ""}`}>
                 {stat.value}
               </p>
-              <p className="dashboard-org-stat-detail">{stat.detail}</p>
+              <p className="dashboard-org-stat-detail">{t(stat.detail)}</p>
             </article>
           ))}
         </section>
@@ -366,14 +371,14 @@ function OrgDashboard() {
             className="btn btn-secondary dashboard-org-export-btn"
             onClick={downloadCompanySummaryStats}
           >
-            Download Summary CSV
+            {t("Download Summary CSV")}
           </button>
           <button
             type="button"
             className="btn btn-primary dashboard-org-export-btn"
             onClick={downloadCompanyPerformanceStats}
           >
-            Download Performance CSV
+            {t("Download Performance CSV")}
           </button>
         </section>
       </div>
@@ -385,7 +390,10 @@ function OrgDashboard() {
 // ---- MAIN EXPORT ----
 export default function Dashboard() {
   const role = getRole();
-  if (role === "COMPANY" || role === "ADMIN") {
+  if (role === "ADMIN") {
+    return <Navigate to="/admin/participants" replace />;
+  }
+  if (role === "COMPANY") {
     return <OrgDashboard />;
   }
   return <UserDashboard />;

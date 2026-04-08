@@ -4,13 +4,18 @@
   position: relative;
   display: flex;
   align-items: center;
+  z-index: 0;
+}
+
+.date-input-wrap--open {
+  z-index: 80;
 }
 
 .date-input-trigger {
   width: 100%;
   padding-right: 60px;
-  color: #f5f7ff;
-  -webkit-text-fill-color: #f5f7ff;
+  color: var(--input-text);
+  -webkit-text-fill-color: var(--input-text);
   cursor: text;
 }
 
@@ -20,8 +25,8 @@
 }
 
 .date-input-trigger::placeholder {
-  color: rgba(236, 241, 255, 0.55);
-  -webkit-text-fill-color: rgba(236, 241, 255, 0.55);
+  color: var(--input-placeholder);
+  -webkit-text-fill-color: var(--input-placeholder);
   font-weight: 500;
 }
 
@@ -32,9 +37,9 @@
   transform: translateY(-50%);
   width: 36px;
   height: 36px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: var(--text-muted);
+  background: var(--input-icon-bg);
+  border: 1px solid var(--input-icon-border);
+  color: var(--input-icon-color);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -47,8 +52,8 @@
 
 .date-input-icon:hover {
   color: var(--accent);
-  background: rgba(0, 229, 255, 0.08);
-  border-color: rgba(0, 229, 255, 0.16);
+  background: var(--input-icon-hover-bg);
+  border-color: var(--input-icon-hover-border);
 }
 
 .date-input-popover {
@@ -59,10 +64,19 @@
   min-width: 300px;
   padding: 18px;
   border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: linear-gradient(180deg, rgba(16, 22, 38, 0.98), rgba(8, 12, 24, 0.98));
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.42);
-  z-index: 30;
+  border: 1px solid var(--panel-elevated-border);
+  background: var(--panel-elevated-bg);
+  box-shadow: var(--panel-elevated-shadow);
+  z-index: 90;
+}
+
+.date-input-popover--portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: min(340px, calc(100vw - 24px));
+  min-width: 0;
+  z-index: 999;
 }
 
 .date-input-popover-header {
@@ -74,7 +88,7 @@
 }
 
 .date-input-popover-title {
-  color: #f5f7ff;
+  color: var(--calendar-title);
   font-family: var(--font-display);
   font-size: 1.08rem;
   font-weight: 700;
@@ -85,9 +99,9 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-muted);
+  border: 1px solid var(--input-icon-border);
+  background: var(--input-icon-bg);
+  color: var(--input-icon-color);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -97,8 +111,8 @@
 
 .date-input-nav:hover {
   color: var(--accent);
-  border-color: rgba(0, 229, 255, 0.16);
-  background: rgba(0, 229, 255, 0.08);
+  border-color: var(--input-icon-hover-border);
+  background: var(--input-icon-hover-bg);
 }
 
 .date-input-grid {
@@ -116,7 +130,7 @@
   justify-content: center;
   align-items: center;
   min-height: 28px;
-  color: rgba(236, 241, 255, 0.55);
+  color: var(--calendar-weekday);
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
@@ -129,7 +143,7 @@
   border: 1px solid transparent;
   border-radius: 12px;
   background: transparent;
-  color: #f5f7ff;
+  color: var(--calendar-title);
   font-size: 0.96rem;
   font-weight: 700;
   cursor: pointer;
@@ -137,32 +151,40 @@
 }
 
 .date-input-day:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--calendar-day-hover-bg);
+  border-color: var(--calendar-day-hover-border);
 }
 
 .date-input-day--outside {
-  color: rgba(236, 241, 255, 0.34);
+  color: var(--calendar-day-outside);
 }
 
 .date-input-day--today {
-  border-color: rgba(255, 255, 255, 0.16);
+  border-color: var(--calendar-day-today-border);
 }
 
 .date-input-day--selected {
-  background: linear-gradient(180deg, rgba(119, 243, 221, 0.96), rgba(98, 227, 208, 0.96));
-  color: #08111e;
-  box-shadow: 0 10px 22px rgba(102, 233, 213, 0.24);
+  background: var(--calendar-day-selected-bg);
+  color: var(--calendar-day-selected-text);
+  box-shadow: var(--calendar-day-selected-shadow);
 }
 
 .date-input-day:disabled {
-  color: rgba(236, 241, 255, 0.18);
+  color: var(--calendar-day-disabled);
   cursor: not-allowed;
 }
 
 @media (max-width: 640px) {
   .date-input-popover {
     min-width: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .date-input-popover {
+    left: 0;
+    right: 0;
     width: 100%;
   }
 }

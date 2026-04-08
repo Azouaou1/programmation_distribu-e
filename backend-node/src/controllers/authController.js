@@ -202,7 +202,7 @@ async function refreshToken(req, res) {
   const { refresh } = req.body;
   if (!refresh) return res.status(400).json({ error: 'Le refresh token est requis.' });
 
-  if (isBlacklisted(refresh)) {
+  if (await isBlacklisted(refresh)) {
     return res.status(401).json({ error: 'Token invalide ou révoqué.' });
   }
 
@@ -227,7 +227,7 @@ async function logout(req, res) {
 
   try {
     jwt.verify(refresh, JWT_SECRET);
-    blacklistToken(refresh);
+    await blacklistToken(refresh);
     return res.json({ message: 'Déconnexion réussie.' });
   } catch {
     return res.status(400).json({ error: 'Token invalide ou déjà blacklisté.' });
@@ -248,7 +248,13 @@ async function getProfile(req, res) {
 
 async function updateProfile(req, res) {
   const user = req.user;
-  const allowedParticipant = ['first_name', 'last_name', 'employer_name'];
+  const allowedParticipant = [
+    'first_name', 'last_name', 'employer_name',
+    'participant_profile_type', 'school_name', 'study_level',
+    'professional_company_name', 'job_title', 'job_started_at',
+    'participant_avatar_url', 'participant_bio', 'favorite_domain',
+    'personal_website_url', 'github_url', 'participant_linkedin_url',
+  ];
   const allowedCompany = [
     'company_name', 'recovery_email', 'company_description',
     'website_url', 'youtube_url', 'linkedin_url',
@@ -310,6 +316,17 @@ async function deleteAccount(req, res) {
       first_name: '[Supprimé]',
       last_name: '[Supprimé]',
       employer_name: '',
+      school_name: '',
+      study_level: '',
+      professional_company_name: '',
+      job_title: '',
+      job_started_at: null,
+      participant_avatar_url: '',
+      participant_bio: '',
+      favorite_domain: '',
+      personal_website_url: '',
+      github_url: '',
+      participant_linkedin_url: '',
       is_active: false,
     });
   } else if (user.role === 'COMPANY') {
@@ -317,6 +334,7 @@ async function deleteAccount(req, res) {
       company_name: '[Entreprise supprimée]',
       company_description: '',
       recovery_email: '',
+      company_logo_url: '',
       website_url: '',
       youtube_url: '',
       linkedin_url: '',
@@ -494,15 +512,44 @@ async function adminStats(req, res) {
     ),
   ]);
 
+  const [
+    totalAdmins,
+    activeUsers,
+    companiesPending,
+    companiesNeedsReview,
+    companiesVerified,
+    companiesRejected,
+    totalViews,
+    waitlistCount,
+  ] = await Promise.all([
+    User.count({ where: { role: 'ADMIN' } }),
+    User.count({ where: { is_active: true } }),
+    User.count({ where: { role: 'COMPANY', verification_status: 'PENDING' } }),
+    User.count({ where: { role: 'COMPANY', verification_status: 'NEEDS_REVIEW' } }),
+    User.count({ where: { role: 'COMPANY', verification_status: 'VERIFIED' } }),
+    User.count({ where: { role: 'COMPANY', verification_status: 'REJECTED' } }),
+    sequelize.query('SELECT COALESCE(SUM(view_count), 0) as total FROM events', { type: QueryTypes.SELECT }),
+    Registration.count({ where: { status: 'WAITLIST' } }),
+  ]);
+
   return res.json({
     users: {
       total_participants: totalParticipants,
       total_companies: totalCompanies,
-      total: totalParticipants + totalCompanies,
+      total_admins: totalAdmins,
+      total: totalParticipants + totalCompanies + totalAdmins,
+      active_total: activeUsers,
       new_this_month: newUsersThisMonth,
+      company_verification: {
+        pending: companiesPending,
+        needs_review: companiesNeedsReview,
+        verified: companiesVerified,
+        rejected: companiesRejected,
+      },
     },
     events: {
       total: totalEvents,
+      total_views: parseInt(totalViews[0].total) || 0,
       new_this_month: newEventsThisMonth,
       by_status: {
         published: eventsByStatus[0],
@@ -523,6 +570,7 @@ async function adminStats(req, res) {
         pending: registrationsByStatus[1],
         rejected: registrationsByStatus[2],
         cancelled: registrationsByStatus[3],
+        waitlist: waitlistCount,
       },
     },
   });
@@ -531,20 +579,41 @@ async function adminStats(req, res) {
 // ─── Admin — Liste utilisateurs ───────────────────────────────────────────────
 
 async function adminListUsers(req, res) {
-  const { role, is_active, page = 1 } = req.query;
-  const limit = 10;
-  const offset = (parseInt(page) - 1) * limit;
+  const { role, is_active, search } = req.query;
 
   const where = { role: { [Op.ne]: 'ADMIN' } };
   if (role && ['PARTICIPANT', 'COMPANY'].includes(role)) where.role = role;
   if (is_active !== undefined) where.is_active = is_active === 'true';
 
-  const { count, rows } = await User.findAndCountAll({
+  if (search && search.trim()) {
+    const terms = search.trim().split(/\s+/).filter(Boolean);
+    const andClauses = terms.map(term => ({
+      [Op.or]: [
+        { email: { [Op.like]: `%${term}%` } },
+        { first_name: { [Op.like]: `%${term}%` } },
+        { last_name: { [Op.like]: `%${term}%` } },
+        { employer_name: { [Op.like]: `%${term}%` } },
+        { school_name: { [Op.like]: `%${term}%` } },
+        { study_level: { [Op.like]: `%${term}%` } },
+        { professional_company_name: { [Op.like]: `%${term}%` } },
+        { job_title: { [Op.like]: `%${term}%` } },
+        { participant_bio: { [Op.like]: `%${term}%` } },
+        { favorite_domain: { [Op.like]: `%${term}%` } },
+        { company_name: { [Op.like]: `%${term}%` } },
+        { company_identifier: { [Op.like]: `%${term}%` } },
+        { recovery_email: { [Op.like]: `%${term}%` } },
+      ],
+    }));
+    where[Op.and] = andClauses;
+  }
+
+  const rows = await User.findAll({
     where,
-    attributes: ['id', 'role', 'email', 'company_name', 'first_name', 'last_name', 'is_active', 'date_joined', 'verification_status'],
+    attributes: [
+      'id', 'role', 'email', 'company_name', 'company_identifier',
+      'first_name', 'last_name', 'is_active', 'date_joined', 'verification_status',
+    ],
     order: [['date_joined', 'ASC']],
-    limit,
-    offset,
   });
 
   const results = rows.map(u => ({
@@ -559,12 +628,7 @@ async function adminListUsers(req, res) {
     verification_status: u.verification_status,
   }));
 
-  return res.json({
-    count,
-    next: offset + limit < count ? `/api/auth/admin/users/?page=${parseInt(page) + 1}` : null,
-    previous: page > 1 ? `/api/auth/admin/users/?page=${parseInt(page) - 1}` : null,
-    results,
-  });
+  return res.json({ count: results.length, results });
 }
 
 // ─── Admin — Suspendre / Activer ─────────────────────────────────────────────
@@ -609,6 +673,17 @@ async function adminDeleteUser(req, res) {
       first_name: '[Supprimé]',
       last_name: '[Supprimé]',
       employer_name: '',
+      school_name: '',
+      study_level: '',
+      professional_company_name: '',
+      job_title: '',
+      job_started_at: null,
+      participant_avatar_url: '',
+      participant_bio: '',
+      favorite_domain: '',
+      personal_website_url: '',
+      github_url: '',
+      participant_linkedin_url: '',
       is_active: false,
     });
   } else {
@@ -616,6 +691,7 @@ async function adminDeleteUser(req, res) {
       company_name: '[Entreprise supprimée]',
       company_description: '',
       recovery_email: '',
+      company_logo_url: '',
       website_url: '',
       youtube_url: '',
       linkedin_url: '',
@@ -690,6 +766,86 @@ async function adminVerifyCompany(req, res) {
   });
 }
 
+// ─── Profil public participant ────────────────────────────────────────
+
+async function getParticipantPublicProfile(req, res) {
+  const participant = await User.findOne({
+    where: { id: req.params.id, role: 'PARTICIPANT' },
+    include: [{ association: 'tags', attributes: ['id', 'name'], through: { attributes: [] } }],
+  });
+
+  if (!participant) return res.status(404).json({ error: 'Participant introuvable.' });
+
+  // Un participant ne peut voir que son propre profil complet ; company/admin voient tout
+  if (req.user.role === 'PARTICIPANT' && req.user.id !== participant.id) {
+    return res.status(403).json({ error: 'Accès refusé.' });
+  }
+
+  const { password, recovery_email, verification_document, ...data } = participant.toJSON();
+  return res.json(data);
+}
+
+// ─── Admin — Détail utilisateur ───────────────────────────────────────
+
+async function adminGetUser(req, res) {
+  const user = await User.findByPk(req.params.id, {
+    include: [{ association: 'tags', attributes: ['id', 'name'], through: { attributes: [] } }],
+  });
+
+  if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+  if (user.role === 'ADMIN') return res.status(403).json({ error: 'Profil admin indisponible.' });
+
+  const { password, ...data } = user.toJSON();
+  return res.json(data);
+}
+
+// ─── Admin — Liste complète companies ───────────────────────────────
+
+async function adminListCompanies(req, res) {
+  const { verification_status, is_active, search } = req.query;
+
+  const where = { role: 'COMPANY' };
+  const validStatuses = ['PENDING', 'VERIFIED', 'REJECTED', 'NEEDS_REVIEW'];
+  if (verification_status && validStatuses.includes(verification_status)) {
+    where.verification_status = verification_status;
+  }
+  if (is_active !== undefined) where.is_active = is_active === 'true';
+
+  if (search && search.trim()) {
+    const terms = search.trim().split(/\s+/).filter(Boolean);
+    const andClauses = terms.map(term => ({
+      [Op.or]: [
+        { company_name: { [Op.like]: `%${term}%` } },
+        { company_identifier: { [Op.like]: `%${term}%` } },
+        { recovery_email: { [Op.like]: `%${term}%` } },
+        { company_description: { [Op.like]: `%${term}%` } },
+        { siret: { [Op.like]: `%${term}%` } },
+        { legal_representative: { [Op.like]: `%${term}%` } },
+        { review_note: { [Op.like]: `%${term}%` } },
+        { website_url: { [Op.like]: `%${term}%` } },
+        { linkedin_url: { [Op.like]: `%${term}%` } },
+        { twitter_url: { [Op.like]: `%${term}%` } },
+        { instagram_url: { [Op.like]: `%${term}%` } },
+        { facebook_url: { [Op.like]: `%${term}%` } },
+      ],
+    }));
+    where[Op.and] = andClauses;
+  }
+
+  const companies = await User.findAll({
+    where,
+    include: [{ association: 'tags', attributes: ['id', 'name'], through: { attributes: [] } }],
+    order: [['date_joined', 'ASC']],
+  });
+
+  const results = companies.map(c => {
+    const { password, ...data } = c.toJSON();
+    return data;
+  });
+
+  return res.json({ count: results.length, results });
+}
+
 module.exports = {
   registerParticipant,
   registerCompany,
@@ -704,11 +860,14 @@ module.exports = {
   passwordResetRequest,
   passwordResetConfirm,
   uploadVerificationDocument,
+  getParticipantPublicProfile,
   adminStats,
   adminListUsers,
+  adminGetUser,
   adminSuspendUser,
   adminActivateUser,
   adminDeleteUser,
   adminPendingCompanies,
   adminVerifyCompany,
+  adminListCompanies,
 };

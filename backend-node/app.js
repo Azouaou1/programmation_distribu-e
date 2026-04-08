@@ -5,6 +5,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const swaggerUi = require('swagger-ui-express');
 
 const app = express();
 
@@ -33,6 +34,17 @@ app.use(express.urlencoded({ extended: true }));
 
 // ─── Fichiers statiques (media) ───────────────────────────────────────────────
 app.use('/media', express.static(path.join(__dirname, 'media')));
+
+// ─── Documentation API (Swagger UI — équivalent /api/docs/ Django) ────────────
+const swaggerSpec = require('./src/config/swagger');
+app.get('/api/schema/', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.json(swaggerSpec);
+});
+app.use('/api/docs/', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: 'Neurovent API Docs',
+  customCss: '.swagger-ui .topbar { background-color: #0d0d12; }',
+}));
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/auth', require('./src/routes/auth'));

@@ -40,8 +40,12 @@ const Event = sequelize.define('Event', {
   },
   capacity: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
     validate: { min: 1 },
+  },
+  unlimited_capacity: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
   },
   status: {
     type: DataTypes.ENUM('DRAFT', 'PUBLISHED', 'CANCELLED'),
@@ -67,6 +71,10 @@ const Event = sequelize.define('Event', {
   registration_deadline: {
     type: DataTypes.DATE,
     allowNull: true,
+  },
+  allow_registration_during_event: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
   },
 
   // ─── Localisation (ONSITE / HYBRID) ─────────────────────────────────
@@ -108,6 +116,39 @@ const Event = sequelize.define('Event', {
     type: DataTypes.DATE,
     allowNull: true,
   },
+  // ─── Suivi notifications email ──────────────────────────────────────────
+  reminder_7d_sent_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  reminder_1d_sent_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  reminder_3h_sent_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  address_reveal_email_sent_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  online_reveal_email_sent_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  almost_full_notified_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  full_notified_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  organizer_digest_sent_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 }, {
   tableName: 'events',
   timestamps: true,
@@ -119,12 +160,20 @@ const Event = sequelize.define('Event', {
 
 Event.prototype.isRegistrationOpen = function () {
   const now = new Date();
-  if (now >= new Date(this.date_start)) return false;
   if (this.registration_deadline && now >= new Date(this.registration_deadline)) return false;
+  if (now >= new Date(this.date_end)) return false;
+  if (now >= new Date(this.date_start)) {
+    // Event a commencé : seulement ONLINE/HYBRID si l'organisateur l'autorise
+    return (
+      this.allow_registration_during_event === true &&
+      ['ONLINE', 'HYBRID'].includes(this.format)
+    );
+  }
   return true;
 };
 
 Event.prototype.getSpotsRemaining = function () {
+  if (this.unlimited_capacity) return null;
   if (!this.registrations) return this.capacity;
   const confirmed = this.registrations.filter(r => r.status === 'CONFIRMED').length;
   return this.capacity - confirmed;

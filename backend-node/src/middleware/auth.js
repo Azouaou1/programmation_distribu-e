@@ -20,7 +20,7 @@ async function authenticate(req, res, next) {
   const token = authHeader.split(' ')[1];
 
   // Vérifier si le token est blacklisté
-  if (isBlacklisted(token)) {
+  if (await isBlacklisted(token)) {
     return res.status(401).json({ error: 'Token invalide ou révoqué.' });
   }
 
@@ -51,7 +51,7 @@ async function optionalAuthenticate(req, res, next) {
     return next();
   }
   const token = authHeader.split(' ')[1];
-  if (isBlacklisted(token)) {
+  if (await isBlacklisted(token)) {
     req.user = null;
     return next();
   }

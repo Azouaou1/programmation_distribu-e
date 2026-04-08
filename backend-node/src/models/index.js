@@ -5,6 +5,7 @@ const User = require('./User');
 const Event = require('./Event');
 const Registration = require('./Registration');
 const Tag = require('./Tag');
+const BlacklistedToken = require('./BlacklistedToken');
 
 // ─── Tables de jointure ManyToMany ───────────────────────────────────────────
 
@@ -46,6 +47,7 @@ module.exports = {
   Event,
   Registration,
   Tag,
+  BlacklistedToken,
   UserTag,
   EventTag,
 };
