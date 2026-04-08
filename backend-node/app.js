@@ -53,6 +53,15 @@ app.use('/api/registrations', require('./src/routes/registrations'));
 app.use('/api/tags', require('./src/routes/tags'));
 app.use('/api/companies', require('./src/routes/companies'));
 
+// ─── Route racine ─────────────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    message: 'Neurovent Node.js API is running',
+    version: '1.0.0',
+  });
+});
+
 // ─── Route de santé ───────────────────────────────────────────────────────────
 app.get('/api/health/', (req, res) => {
   res.json({
