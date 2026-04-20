@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neurovent-frontend
+  labels:
+    app: neurovent-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neurovent-frontend
+  template:
+    metadata:
+      labels:
+        app: neurovent-frontend
+    spec:
+      serviceAccountName: neurovent-frontend-sa
+      automountServiceAccountToken: false
+      containers:
+        - name: neurovent-frontend
+          image: az1810/events-app-frontend:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neurovent-frontend
+spec:
+  selector:
+    app: neurovent-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+  type: NodePort

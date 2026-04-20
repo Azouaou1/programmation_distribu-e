@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: neurovent-backend
+  labels:
+    app: neurovent-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: neurovent-backend
+  template:
+    metadata:
+      labels:
+        app: neurovent-backend
+    spec:
+      serviceAccountName: neurovent-backend-sa
+      automountServiceAccountToken: false
+      containers:
+        - name: neurovent-backend
+          image: az1810/events-app-backend:latest
+          ports:
+            - containerPort: 8001
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "8001"
+            - name: DB_DIALECT
+              value: "postgres"
+            - name: DB_HOST
+              value: "neurovent-postgres"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "neurovent"
+            - name: DB_USER
+              value: "neurovent"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: neurovent-secrets
+                  key: postgres-password
+            - name: DB_SSL
+              value: "false"
+            - name: FRONTEND_URL
+              value: "http://neurovent.local"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: neurovent-secrets
+                  key: jwt-secret
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neurovent-backend
+spec:
+  selector:
+    app: neurovent-backend
+  ports:
+    - protocol: TCP
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP

@@ -33,6 +33,7 @@ if (process.env.DATABASE_URL) {
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
   });
 } else {
+  const useSSL = process.env.DB_SSL !== 'false';
   sequelize = new Sequelize(
     process.env.DB_NAME,
     process.env.DB_USER,
@@ -42,12 +43,11 @@ if (process.env.DATABASE_URL) {
       port: process.env.DB_PORT || 5432,
       dialect: 'postgres',
       logging: false,
-      dialectOptions: {
-        ssl: {
-          require: true,
-          rejectUnauthorized: false,
+      ...(useSSL && {
+        dialectOptions: {
+          ssl: { require: true, rejectUnauthorized: false },
         },
-      },
+      }),
       pool: { max: 5, min: 0, acquire: 30000, idle: 10000 },
     }
   );

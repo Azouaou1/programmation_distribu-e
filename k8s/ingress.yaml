@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: neurovent-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: neurovent.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: neurovent-backend
+                port:
+                  number: 8001
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: neurovent-frontend
+                port:
+                  number: 80

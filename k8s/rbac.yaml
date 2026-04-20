@@ -1,0 +1,69 @@
+# ServiceAccount dédié pour le backend (au lieu du default)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neurovent-backend-sa
+  namespace: default
+---
+# ServiceAccount dédié pour le frontend
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neurovent-frontend-sa
+  namespace: default
+---
+# Role : droits minimaux pour le backend
+# Peut lire les secrets et configmaps dont il a besoin
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: neurovent-backend-role
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+---
+# Role : droits minimaux pour le frontend (lecture seule)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: neurovent-frontend-role
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+---
+# RoleBinding : lie le backend à son role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: neurovent-backend-rolebinding
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: neurovent-backend-sa
+    namespace: default
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: neurovent-backend-role
+---
+# RoleBinding : lie le frontend à son role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: neurovent-frontend-rolebinding
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: neurovent-frontend-sa
+    namespace: default
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: neurovent-frontend-role
